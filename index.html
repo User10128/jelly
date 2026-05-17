@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Abyssal Jelly - Deep Sea Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #030B14;
+            font-family: 'Outfit', sans-serif;
+            touch-action: none; /* Prevent scroll on touch */
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: rgba(10, 30, 60, 0.3);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            border-radius: 1.5rem;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .glass-btn {
+            background: rgba(0, 200, 255, 0.2);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border: 1px solid rgba(0, 200, 255, 0.4);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .glass-btn:hover {
+            background: rgba(0, 200, 255, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 200, 255, 0.4);
+        }
+        
+        .glass-btn:active {
+            transform: translateY(1px);
+        }
+
+        .glass-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through to canvas by default */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .pointer-events-auto {
+            pointer-events: auto;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Background blur class applied in menu/gameover states */
+        .blur-canvas {
+            filter: blur(15px) brightness(0.6);
+        }
+
+        /* Custom scrollbar styling for upgrades container */
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(0, 200, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        /* Float animation for jellyfish logo */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas for rendering game -->
+    <canvas id="gameCanvas" class="blur-canvas"></canvas>
+
+    <!-- UI Overlay -->
+    <div id="uiContainer" class="ui-layer">
+        
+        <!-- Scorecard HUD (Top) -->
+        <div id="hud" class="absolute top-4 left-4 right-4 flex justify-between items-start hidden">
+            <div class="glass-panel px-4 py-2 flex flex-col pointer-events-auto">
+                <span class="text-sm text-cyan-200 uppercase tracking-wider font-semibold">Score</span>
+                <span id="scoreDisplay" class="text-3xl font-bold text-white leading-none">0</span>
+            </div>
+            
+            <div class="flex flex-col items-end gap-2">
+                <div class="glass-panel px-4 py-2 flex gap-3 items-center pointer-events-auto">
+                    <div class="w-5 h-5 rounded-full bg-yellow-400 border-[3px] border-yellow-500 shadow-[0_0_8px_rgba(250,204,21,0.6)]"></div>
+                    <span id="coinsDisplay" class="text-2xl font-bold text-yellow-300">0</span>
+                </div>
+                <div id="activePowerups" class="flex gap-2">
+                    <!-- Powerup icons injected dynamically here (strictly SVGs, no emojis) -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Intro Screen -->
+        <div id="introScreen" class="glass-panel p-8 max-w-md w-11/12 flex flex-col items-center text-center pointer-events-auto transform transition-all">
+            <svg class="w-20 h-20 mb-4 animate-float text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.6)]" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C7.58 2 4 5.58 4 10v2h16v-2c0-4.42-3.58-8-8-8zm-4 12c0 2.21-1.79 4-4 4s-4-1.79-4-4V10h2v4c0 1.1.9 2 2 2s2-.9 2-2v-4h2v4zm16 0c0 2.21-1.79 4-4 4s-4-1.79-4-4V10h2v4c0 1.1.9 2 2 2s2-.9 2-2v-4h2v4zm-8 2c-2.21 0-4-1.79-4-4v-4h2v4c0 1.1.9 2 2 2s2-.9 2-2v-4h2v4c0 2.21-1.79 4-4 4z"/>
+            </svg>
+            <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-500 mb-2">Abyssal Jelly</h1>
+            <p class="text-blue-100 mb-6 text-sm">Navigate the deep underwater tunnels, gather coins, and activate powerful upgrades! Click, Tap, or press Space to swim upward.</p>
+            
+            <div class="grid grid-cols-2 gap-4 text-center w-full mb-6 text-xs">
+                <div class="bg-white/5 p-2.5 rounded-lg border border-white/10 flex flex-col justify-center">
+                    <span class="text-cyan-200 font-bold mb-0.5">Flashlight</span>
+                    <span class="text-blue-100/70">Expands lighting</span>
+                </div>
+                <div class="bg-white/5 p-2.5 rounded-lg border border-white/10 flex flex-col justify-center">
+                    <span class="text-red-300 font-bold mb-0.5">TNT</span>
+                    <span class="text-blue-100/70">Explodes caves</span>
+                </div>
+                <div class="bg-white/5 p-2.5 rounded-lg border border-white/10 flex flex-col justify-center">
+                    <span class="text-orange-300 font-bold mb-0.5">Helper</span>
+                    <span class="text-blue-100/70">Absorbs 1 crash</span>
+                </div>
+                <div class="bg-white/5 p-2.5 rounded-lg border border-white/10 flex flex-col justify-center">
+                    <span class="text-yellow-300 font-bold mb-0.5">Gold Coin</span>
+                    <span class="text-blue-100/70">+200 bonus score</span>
+                </div>
+            </div>
+
+            <button id="startBtn" class="glass-btn w-full py-3 rounded-xl text-xl font-bold tracking-wide">DIVE IN</button>
+        </div>
+
+        <!-- Game Over & Upgrade Card -->
+        <div id="gameOverScreen" class="glass-panel p-8 max-w-md w-11/12 flex flex-col items-center text-center pointer-events-auto hidden">
+            <h2 class="text-4xl font-extrabold text-red-400 mb-2">Game Over</h2>
+            
+            <div class="w-full flex justify-between items-center bg-black/20 rounded-xl p-4 mb-4 border border-white/10">
+                <div class="flex flex-col text-left">
+                    <span class="text-sm text-cyan-200 uppercase">Final Score</span>
+                    <span id="finalScoreDisplay" class="text-3xl font-bold">0</span>
+                </div>
+                <div class="flex flex-col text-right">
+                    <span class="text-sm text-yellow-200 uppercase">Total Coins</span>
+                    <span id="totalCoinsDisplay" class="text-3xl font-bold text-yellow-300">0</span>
+                </div>
+            </div>
+
+            <!-- Upgrades Section -->
+            <div class="w-full bg-white/5 rounded-xl p-4 mb-6 border border-white/10 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 z-0"></div>
+                <h3 class="text-lg font-bold text-cyan-300 mb-3 relative z-10 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="currentColor"><path d="M12,2L14.5,8.5L21,11L14.5,13.5L12,20L9.5,13.5L3,11L9.5,8.5L12,2Z"/></svg>
+                    Shop Upgrades
+                    <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="currentColor"><path d="M12,2L14.5,8.5L21,11L14.5,13.5L12,20L9.5,13.5L3,11L9.5,8.5L12,2Z"/></svg>
+                </h3>
+                
+                <!-- Upgrade List with Custom Scrollbar -->
+                <div class="flex flex-col gap-3 max-h-48 overflow-y-auto pr-1 relative z-10 custom-scroll">
+                    
+                    <!-- Upgrade 1: Passive Score Multiplier -->
+                    <div class="flex justify-between items-center bg-black/20 p-2 rounded-lg border border-white/5 text-xs">
+                        <div class="text-left max-w-[65%]">
+                            <div class="font-bold text-white">Score Multiplier x2</div>
+                            <div class="text-[10px] text-blue-200">Double passive score forever</div>
+                        </div>
+                        <button id="upgradeBtn" class="glass-btn px-3 py-1.5 rounded-lg font-bold min-w-[85px] text-[11px] h-8 flex items-center justify-center">
+                            <span id="upgradeCost" class="flex items-center gap-1">1500 <div class="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-500"></div></span>
+                        </button>
+                    </div>
+
+                    <!-- Upgrade 2: Start Shield -->
+                    <div class="flex justify-between items-center bg-black/20 p-2 rounded-lg border border-white/5 text-xs">
+                        <div class="text-left max-w-[65%]">
+                            <div class="font-bold text-white">Start Shield</div>
+                            <div class="text-[10px] text-blue-200">Begin every dive with Helper Fish</div>
+                        </div>
+                        <button id="upgradeShieldBtn" class="glass-btn px-3 py-1.5 rounded-lg font-bold min-w-[85px] text-[11px] h-8 flex items-center justify-center">
+                            <span id="upgradeShieldCost" class="flex items-center gap-1">800 <div class="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-500"></div></span>
+                        </button>
+                    </div>
+
+                    <!-- Upgrade 3: Lighthouse Beam -->
+                    <div class="flex justify-between items-center bg-black/20 p-2 rounded-lg border border-white/5 text-xs">
+                        <div class="text-left max-w-[65%]">
+                            <div class="font-bold text-white">Lighthouse Beam</div>
+                            <div class="text-[10px] text-blue-200">Flashlights last 50% longer</div>
+                        </div>
+                        <button id="upgradeFlashlightBtn" class="glass-btn px-3 py-1.5 rounded-lg font-bold min-w-[85px] text-[11px] h-8 flex items-center justify-center">
+                            <span id="upgradeFlashlightCost" class="flex items-center gap-1">1000 <div class="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-500"></div></span>
+                        </button>
+                    </div>
+
+                    <!-- Upgrade 4: Coin Magnet -->
+                    <div class="flex justify-between items-center bg-black/20 p-2 rounded-lg border border-white/5 text-xs">
+                        <div class="text-left max-w-[65%]">
+                            <div class="font-bold text-white">Coin Magnet</div>
+                            <div class="text-[10px] text-blue-200">Attract nearby coins automatically</div>
+                        </div>
+                        <button id="upgradeMagnetBtn" class="glass-btn px-3 py-1.5 rounded-lg font-bold min-w-[85px] text-[11px] h-8 flex items-center justify-center">
+                            <span id="upgradeMagnetCost" class="flex items-center gap-1">2000 <div class="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-500"></div></span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            <button id="restartBtn" class="glass-btn w-full py-3 rounded-xl text-xl font-bold tracking-wide">PLAY AGAIN</button>
+        </div>
+    </div>
+
+<script>
+    /**
+     * Game Configuration & State
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // UI Elements
+    const introScreen = document.getElementById('introScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const hud = document.getElementById('hud');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const coinsDisplay = document.getElementById('coinsDisplay');
+    const finalScoreDisplay = document.getElementById('finalScoreDisplay');
+    const totalCoinsDisplay = document.getElementById('totalCoinsDisplay');
+    const activePowerupsDiv = document.getElementById('activePowerups');
+    
+    const upgradeBtn = document.getElementById('upgradeBtn');
+    const upgradeShieldBtn = document.getElementById('upgradeShieldBtn');
+    const upgradeFlashlightBtn = document.getElementById('upgradeFlashlightBtn');
+    const upgradeMagnetBtn = document.getElementById('upgradeMagnetBtn');
+
+    let w, h;
+    let frame = 0;
+    let gameState = 'START'; // START, PLAYING, GAMEOVER
+    
+    // Upgrades state
+    let totalCoins = 0;
+    let hasMultiplierUpgrade = false;
+    let hasShieldUpgrade = false;
+    let hasFlashlightUpgrade = false;
+    let hasMagnetUpgrade = false;
+
+    // Upgrades pricing
+    const upgradeCost = 1500;
+    const upgradeShieldCost = 800;
+    const upgradeFlashlightCost = 1000;
+    const upgradeMagnetCost = 2000;
+
+    // Game Variables
+    let score = 0;
+    let gameSpeed = 3;
+    let baseScoreRate = 0.05; // Score added per frame
+    
+    let caves = [];
+    let items = []; // Coins and powerups
+    let particles = [];
+    
+    // Player object (slowed down slightly)
+    const player = {
+        x: 0, y: 0,
+        radius: 15,
+        vy: 0,
+        gravity: 0.22,
+        jumpPower: -4.5,
+        hasHelper: false,
+        flashlightTimer: 0, // Frames remaining
+        baseLightRadius: 150,
+        bonusLightRadius: 0
+    };
+
+    // Input Handling
+    let isInputActive = false;
+
+    function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+        // Position player slightly off-center
+        if(gameState === 'START') {
+            player.x = w * 0.2;
+            player.y = h * 0.5;
+        }
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Controls
+    function handleInputStart(e) {
+        if(e.type === 'touchstart') e.preventDefault(); // Prevent scrolling
+        if (gameState === 'PLAYING') {
+            player.vy = player.jumpPower;
+            createSwimParticles();
+        }
+    }
+    
+    window.addEventListener('mousedown', handleInputStart);
+    window.addEventListener('touchstart', handleInputStart, {passive: false});
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' || e.code === 'ArrowUp') {
+            handleInputStart(e);
+        }
+    });
+
+    // Button Listeners
+    document.getElementById('startBtn').addEventListener('click', startGame);
+    document.getElementById('restartBtn').addEventListener('click', startGame);
+    
+    // Upgrades binding
+    upgradeBtn.addEventListener('click', () => buyUpgrade('multiplier'));
+    upgradeShieldBtn.addEventListener('click', () => buyUpgrade('shield'));
+    upgradeFlashlightBtn.addEventListener('click', () => buyUpgrade('flashlight'));
+    upgradeMagnetBtn.addEventListener('click', () => buyUpgrade('magnet'));
+
+    function startGame() {
+        score = 0;
+        frame = 0;
+        gameSpeed = 3;
+        caves = [];
+        items = [];
+        particles = [];
+        
+        player.x = w * 0.2;
+        player.y = h * 0.5;
+        player.vy = 0;
+        player.hasHelper = hasShieldUpgrade; // Set helper shield if upgrade is purchased
+        player.flashlightTimer = 0;
+        player.bonusLightRadius = 0;
+
+        gameState = 'PLAYING';
+        
+        // Remove background blur on canvas
+        canvas.classList.remove('blur-canvas');
+
+        introScreen.classList.add('hidden');
+        gameOverScreen.classList.add('hidden');
+        hud.classList.remove('hidden');
+        updateHUD();
+    }
+
+    function gameOver() {
+        gameState = 'GAMEOVER';
+        hud.classList.add('hidden');
+        gameOverScreen.classList.remove('hidden');
+        
+        // Add modern background blur on canvas
+        canvas.classList.add('blur-canvas');
+
+        finalScoreDisplay.innerText = Math.floor(score);
+        totalCoinsDisplay.innerText = totalCoins;
+        
+        updateUpgradeButtons();
+    }
+
+    function buyUpgrade(type) {
+        if (type === 'multiplier' && !hasMultiplierUpgrade && totalCoins >= upgradeCost) {
+            totalCoins -= upgradeCost;
+            hasMultiplierUpgrade = true;
+            createExplosion(w/2, h/2, 'cyan');
+        } else if (type === 'shield' && !hasShieldUpgrade && totalCoins >= upgradeShieldCost) {
+            totalCoins -= upgradeShieldCost;
+            hasShieldUpgrade = true;
+            createExplosion(w/2, h/2, 'cyan');
+        } else if (type === 'flashlight' && !hasFlashlightUpgrade && totalCoins >= upgradeFlashlightCost) {
+            totalCoins -= upgradeFlashlightCost;
+            hasFlashlightUpgrade = true;
+            createExplosion(w/2, h/2, 'cyan');
+        } else if (type === 'magnet' && !hasMagnetUpgrade && totalCoins >= upgradeMagnetCost) {
+            totalCoins -= upgradeMagnetCost;
+            hasMagnetUpgrade = true;
+            createExplosion(w/2, h/2, 'cyan');
+        }
+
+        totalCoinsDisplay.innerText = totalCoins;
+        coinsDisplay.innerText = totalCoins; // Sync HUD
+        updateUpgradeButtons();
+    }
+
+    function updateUpgradeButtons() {
+        const renderButton = (btn, hasUpgrade, cost) => {
+            if (hasUpgrade) {
+                btn.innerHTML = "OWNED";
+                btn.disabled = true;
+                btn.classList.remove('glass-btn');
+                btn.style.background = 'rgba(0, 255, 100, 0.2)';
+                btn.style.border = '1px solid rgba(0, 255, 100, 0.4)';
+            } else {
+                btn.disabled = totalCoins < cost;
+                btn.classList.add('glass-btn');
+                btn.style.background = '';
+                btn.style.border = '';
+                btn.innerHTML = `${cost} <div class="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-500"></div>`;
+            }
+        };
+
+        renderButton(upgradeBtn, hasMultiplierUpgrade, upgradeCost);
+        renderButton(upgradeShieldBtn, hasShieldUpgrade, upgradeShieldCost);
+        renderButton(upgradeFlashlightBtn, hasFlashlightUpgrade, upgradeFlashlightCost);
+        renderButton(upgradeMagnetBtn, hasMagnetUpgrade, upgradeMagnetCost);
+    }
+
+    /**
+     * Entities Generation
+     */
+    function generateCave() {
+        if (frame % Math.floor(100 / (gameSpeed/3)) !== 0) return; // Scale generation with speed
+        
+        let gapSize = Math.max(160, 250 - (frame * 0.01)); // Gap shrinks over time
+        let minHeight = 50;
+        let maxHeight = h - gapSize - minHeight;
+        let topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1) + minHeight);
+        
+        caves.push({
+            x: w,
+            width: 80,
+            top: topHeight,
+            bottom: h - (topHeight + gapSize),
+            passed: false
+        });
+
+        // Spawn Items randomly within the gap
+        if (Math.random() < 0.4) {
+            let itemType = 'coin';
+            let r = Math.random();
+            if (r > 0.9) itemType = 'helper';
+            else if (r > 0.8) itemType = 'tnt';
+            else if (r > 0.7) itemType = 'flashlight';
+
+            items.push({
+                x: w + 40,
+                y: topHeight + (gapSize / 2) + (Math.random() * 40 - 20),
+                type: itemType,
+                radius: 15,
+                collected: false,
+                floatOffset: Math.random() * Math.PI * 2
+            });
+        }
+    }
+
+    function createSwimParticles() {
+        for(let i=0; i<3; i++) {
+            particles.push({
+                x: player.x - 10,
+                y: player.y + (Math.random() * 10 - 5),
+                vx: -Math.random() * 2 - 1,
+                vy: Math.random() * 2 - 1,
+                life: 1,
+                color: 'rgba(150, 220, 255, 0.8)',
+                size: Math.random() * 3 + 1
+            });
+        }
+    }
+
+    function createExplosion(x, y, colorStr = 'orange') {
+        const colors = colorStr === 'orange' ? ['#ff4500', '#ffa500', '#ffff00'] : ['#00ffff', '#0099ff', '#ffffff'];
+        for(let i=0; i<30; i++) {
+            particles.push({
+                x: x,
+                y: y,
+                vx: (Math.random() - 0.5) * 15,
+                vy: (Math.random() - 0.5) * 15,
+                life: 1,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                size: Math.random() * 5 + 2
+            });
+        }
+    }
+
+    function activateTNT() {
+        createExplosion(player.x, player.y, 'orange');
+        caves.forEach(cave => {
+            // Push them off screen
+            cave.top = 0;
+            cave.bottom = 0;
+        });
+        
+        // Shake screen gently
+        canvas.style.transform = "translate(5px, 5px)";
+        setTimeout(() => canvas.style.transform = "translate(-5px, -5px)", 50);
+        setTimeout(() => canvas.style.transform = "translate(5px, -5px)", 100);
+        setTimeout(() => canvas.style.transform = "translate(0, 0)", 150);
+    }
+
+    function updateHUD() {
+        scoreDisplay.innerText = Math.floor(score);
+        coinsDisplay.innerText = totalCoins;
+        
+        // Dynamic Powerup Icons (recreated as premium inline SVG assets, zero emojis)
+        activePowerupsDiv.innerHTML = '';
+        if (player.hasHelper) {
+            activePowerupsDiv.innerHTML += `
+                <div class="glass-panel w-10 h-10 flex items-center justify-center text-orange-300">
+                    <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12,10.14C11.53,10.14 11.14,10.53 11.14,11C11.14,11.47 11.53,11.86 12,11.86C12.47,11.86 12.86,11.47 12.86,11C12.86,10.53 12.47,10.14 12,10.14M22,11C22,10.42 21.84,9.88 21.57,9.41L18.73,11.05C18.9,11.34 19,11.66 19,12C19,13.29 18.29,14.4 17.16,14.82L15.65,17.43C17.45,16.89 19,15.58 20,13.91L23.46,15.91C23.08,16.58 22.58,17.18 22,17.67V21L18,18.78C16.14,19.92 14.06,20.5 12,20.5C6.48,20.5 2,16.02 2,10.5C2,4.98 6.48,0.5 12,0.5C14.76,0.5 17.26,1.62 19.07,3.41L16.95,5.53C15.68,4.26 13.93,3.5 12,3.5C8.13,3.5 5,6.63 5,10.5C5,14.37 8.13,17.5 12,17.5C13.56,17.5 15,16.97 16.14,16.11L18.4,20L20,19.06V14.15C21.22,13.41 22,12.28 22,11Z"/>
+                    </svg>
+                </div>`;
+        }
+        if (player.flashlightTimer > 0) {
+            activePowerupsDiv.innerHTML += `
+                <div class="glass-panel w-10 h-10 flex items-center justify-center text-cyan-200 border-cyan-400">
+                    <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9.8,2L8.4,3.4L10.5,5.5L4.4,11.6L5.8,13L11.9,6.9L14,9L15.4,7.6L9.8,2M16,10V13H19V10H16M15,14V17H20V14H15M14,18V21H21V18H14Z"/>
+                    </svg>
+                </div>`;
+        }
+    }
+
+    /**
+     * Main Update Logic
+     */
+    function update() {
+        if (gameState !== 'PLAYING') return;
+
+        frame++;
+        
+        // Increase speed slightly
+        gameSpeed += 0.0005;
+
+        // Multiplier logic
+        let currentMultiplier = hasMultiplierUpgrade ? 2 : 1;
+        score += baseScoreRate * currentMultiplier;
+
+        // Player physics
+        player.vy += player.gravity;
+        player.y += player.vy;
+
+        // Ceiling/Floor boundaries
+        if (player.y < player.radius) {
+            player.y = player.radius;
+            player.vy = 0;
+        }
+        if (player.y > h - player.radius) {
+            player.y = h - player.radius;
+            handleCollision();
+        }
+
+        // Powerups timers
+        if (player.flashlightTimer > 0) {
+            player.flashlightTimer--;
+            player.bonusLightRadius = 150; // Extra vision radius
+        } else {
+            player.bonusLightRadius = 0;
+        }
+
+        generateCave();
+
+        // Update Caves
+        for (let i = 0; i < caves.length; i++) {
+            let cave = caves[i];
+            cave.x -= gameSpeed;
+
+            // Collision Box for Player
+            let pRect = { left: player.x - player.radius + 5, right: player.x + player.radius - 5, top: player.y - player.radius + 5, bottom: player.y + player.radius - 5 };
+            
+            // Top Cave Box
+            let topRect = { left: cave.x, right: cave.x + cave.width, top: 0, bottom: cave.top };
+            // Bottom Cave Box
+            let botRect = { left: cave.x, right: cave.x + cave.width, top: h - cave.bottom, bottom: h };
+
+            // Check overlap
+            if (pRect.right > topRect.left && pRect.left < topRect.right && pRect.bottom > topRect.top && pRect.top < topRect.bottom) {
+                handleCollision();
+            }
+            if (pRect.right > botRect.left && pRect.left < botRect.right && pRect.bottom > botRect.top && pRect.top < botRect.bottom) {
+                handleCollision();
+            }
+        }
+
+        // Remove offscreen caves
+        caves = caves.filter(cave => cave.x + cave.width > 0);
+
+        // Update Items
+        for (let i = 0; i < items.length; i++) {
+            let item = items[i];
+            item.x -= gameSpeed;
+            
+            // Magnet Upgrade effect (Attract Coins only)
+            if (hasMagnetUpgrade && item.type === 'coin') {
+                let dx = player.x - item.x;
+                let dy = player.y - item.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 180) {
+                    let pullStrength = 3.5 * (1 - dist / 180); // Pulls stronger as it gets closer
+                    item.x += (dx / dist) * pullStrength;
+                    item.y += (dy / dist) * pullStrength;
+                }
+            }
+
+            // Hover animation effect
+            item.y += Math.sin(frame * 0.05 + item.floatOffset) * 0.5;
+
+            if (!item.collected) {
+                let dx = player.x - item.x;
+                let dy = player.y - item.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist < player.radius + item.radius) {
+                    item.collected = true;
+                    collectItem(item.type);
+                }
+            }
+        }
+        items = items.filter(item => !item.collected && item.x + item.radius > 0);
+
+        // Update Particles
+        for (let i = 0; i < particles.length; i++) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.02;
+        }
+        particles = particles.filter(p => p.life > 0);
+
+        if(frame % 10 === 0) updateHUD(); // Optimize DOM writes to every 10 frames
+    }
+
+    function collectItem(type) {
+        if (type === 'coin') {
+            totalCoins += 200;
+            score += 200; // Immediate bonus score
+            createExplosion(player.x, player.y, 'yellow');
+        } else if (type === 'flashlight') {
+            // Lighthouse Beam upgrade extends powerup duration by 50%
+            player.flashlightTimer = hasFlashlightUpgrade ? 900 : 600; 
+            createExplosion(player.x, player.y, 'cyan');
+        } else if (type === 'tnt') {
+            activateTNT();
+        } else if (type === 'helper') {
+            player.hasHelper = true;
+            createExplosion(player.x, player.y, 'cyan');
+        }
+        updateHUD();
+    }
+
+    function handleCollision() {
+        if (player.hasHelper) {
+            // Shield breaks, bounce back slightly and give brief safety clearance
+            player.hasHelper = false;
+            player.x -= 20; 
+            player.vy = 0;
+            createExplosion(player.x, player.y, 'cyan');
+            
+            // Clear immediate area to prevent getting stuck again
+            caves.forEach(cave => {
+                if(Math.abs(cave.x - player.x) < 150) {
+                    cave.top = 0;
+                    cave.bottom = 0;
+                }
+            });
+            updateHUD();
+        } else {
+            gameOver();
+        }
+    }
+
+    /**
+     * Rendering Logic
+     */
+    function draw() {
+        // 1. Background Layers (Layers of blue, parallax)
+        ctx.fillStyle = '#020A14'; // Deepest ocean layer
+        ctx.fillRect(0, 0, w, h);
+
+        // Parallax waves
+        let waveSpeed1 = frame * 0.5;
+        let waveSpeed2 = frame * 1;
+        let waveSpeed3 = frame * 1.5;
+
+        const drawWave = (color, offset, amplitude, frequency, baseHeight) => {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(0, h);
+            for (let x = 0; x <= w; x += 50) {
+                let y = baseHeight + Math.sin(x * frequency + offset) * amplitude;
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(w, h);
+            ctx.lineTo(0, h);
+            ctx.fill();
+        };
+
+        // Draw layered blue depths
+        drawWave('#041629', waveSpeed1 * 0.01, 30, 0.005, h * 0.3);
+        drawWave('#07213D', waveSpeed2 * 0.01, 40, 0.004, h * 0.6);
+        drawWave('#0A2E52', waveSpeed3 * 0.01, 20, 0.006, h * 0.85);
+
+        // 2. Draw Caves
+        caves.forEach(cave => {
+            // Top pillar gradient
+            let gradTop = ctx.createLinearGradient(cave.x, 0, cave.x + cave.width, 0);
+            gradTop.addColorStop(0, '#102A45');
+            gradTop.addColorStop(1, '#051221');
+            ctx.fillStyle = gradTop;
+            
+            ctx.beginPath();
+            ctx.roundRect(cave.x, 0, cave.width, cave.top, [0, 0, 10, 10]);
+            ctx.fill();
+
+            // Bottom pillar gradient
+            let gradBot = ctx.createLinearGradient(cave.x, 0, cave.x + cave.width, 0);
+            gradBot.addColorStop(0, '#102A45');
+            gradBot.addColorStop(1, '#051221');
+            ctx.fillStyle = gradBot;
+            
+            ctx.beginPath();
+            ctx.roundRect(cave.x, h - cave.bottom, cave.width, cave.bottom, [10, 10, 0, 0]);
+            ctx.fill();
+            
+            // Neon edge highlight lines
+            ctx.strokeStyle = 'rgba(0, 200, 255, 0.1)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+
+        // 3. Draw Items (Vector-drawn shapes, no emojis)
+        items.forEach(item => {
+            ctx.save();
+            ctx.translate(item.x, item.y);
+            ctx.rotate(Math.sin(frame * 0.1 + item.floatOffset) * 0.2);
+            
+            // Soft neon bloom behind the pickup
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.2 + Math.sin(frame*0.1)*0.1})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, item.radius * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+
+            if(item.type === 'coin') {
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#DAA520';
+                ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
+            } else if(item.type === 'flashlight') {
+                ctx.fillStyle = '#64748b'; // body
+                ctx.fillRect(-6, -4, 10, 8);
+                ctx.fillStyle = '#334155'; // head
+                ctx.fillRect(4, -6, 4, 12);
+                ctx.fillStyle = 'rgba(34, 211, 238, 0.6)'; // beam
+                ctx.beginPath();
+                ctx.moveTo(8, -6); ctx.lineTo(18, -12); ctx.lineTo(18, 12); ctx.lineTo(8, 6);
+                ctx.fill();
+            } else if(item.type === 'tnt') {
+                ctx.fillStyle = '#ef4444'; // body
+                ctx.fillRect(-6, -8, 12, 16);
+                ctx.fillStyle = '#f8fafc'; // band
+                ctx.fillRect(-6, -2, 12, 4);
+                ctx.strokeStyle = '#0f172a'; // fuse
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(0, -8); ctx.quadraticCurveTo(5, -12, 8, -10); ctx.stroke();
+            } else if(item.type === 'helper') {
+                ctx.scale(1.2, 1.2);
+                ctx.fillStyle = '#fdbf11'; // orange tail
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-10, -6); ctx.lineTo(-10, 6); ctx.fill();
+                ctx.fillStyle = '#f97316'; // orange body
+                ctx.beginPath(); ctx.ellipse(2, 0, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = 'white'; // eye
+                ctx.beginPath(); ctx.arc(6, -2, 1.5, 0, Math.PI * 2); ctx.fill();
+            }
+            
+            ctx.restore();
+        });
+
+        // 4. Draw Particles
+        particles.forEach(p => {
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.life;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        });
+
+        // 5. Draw Player (Jellyfish)
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(player.vy * 0.05);
+
+        // Helper fish orbiting around the player
+        if (player.hasHelper) {
+            let orbitX = Math.cos(frame * 0.05) * 35;
+            let orbitY = Math.sin(frame * 0.05) * 35;
+            ctx.save();
+            ctx.translate(orbitX, orbitY);
+            if (Math.cos(frame * 0.05) < 0) ctx.scale(-1, 1); // Flip horizontally depending on direction
+            ctx.fillStyle = '#fdbf11'; 
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-8, -5); ctx.lineTo(-8, 5); ctx.fill();
+            ctx.fillStyle = '#f97316'; 
+            ctx.beginPath(); ctx.ellipse(2, 0, 6, 4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'white'; 
+            ctx.beginPath(); ctx.arc(5, -1.5, 1, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
+
+        // Jellyfish Head (Dome)
+        ctx.fillStyle = 'rgba(255, 100, 200, 0.7)';
+        ctx.shadowColor = 'rgba(255, 100, 200, 0.8)';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(0, -5, player.radius, Math.PI, 0);
+        ctx.fill();
+        
+        // Jellyfish Base
+        ctx.beginPath();
+        ctx.ellipse(0, -5, player.radius, 5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(200, 80, 180, 0.8)';
+        ctx.fill();
+
+        // Tentacles
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(255, 150, 220, 0.6)';
+        ctx.lineWidth = 2;
+        let tentacleWiggle = Math.sin(frame * 0.2);
+        for(let i = -2; i <= 2; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i * 4, -5);
+            ctx.quadraticCurveTo(i * 6 + tentacleWiggle * 3, 5, i * 3 + tentacleWiggle * 5, 15 + Math.random()*2);
+            ctx.stroke();
+        }
+
+        // Flashlight active emission indicator from head
+        if (player.flashlightTimer > 0) {
+            ctx.fillStyle = `rgba(0, 255, 255, ${0.5 + Math.sin(frame*0.2)*0.2})`;
+            ctx.beginPath();
+            ctx.arc(0, -player.radius-5, 3, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+
+        // 6. Glow Lighting Cutout / Overlay Effects
+        if (gameState === 'PLAYING') {
+            ctx.globalCompositeOperation = 'lighter';
+            
+            // Base ambient glow around jellyfish
+            let actualRadius = player.baseLightRadius + Math.sin(frame * 0.05) * 10;
+            if(player.hasHelper) actualRadius += 20;
+
+            let gradient = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, actualRadius);
+            gradient.addColorStop(0, 'rgba(34, 211, 238, 0.2)'); // Soft cyan glow
+            gradient.addColorStop(1, 'rgba(34, 211, 238, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, actualRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Flashlight bonus illumination power
+            if (player.bonusLightRadius > 0) {
+                let flashRadius = player.bonusLightRadius + Math.sin(frame * 0.1) * 15;
+                let flashGradient = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, flashRadius);
+                flashGradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)'); // White center intensity
+                flashGradient.addColorStop(0.4, 'rgba(34, 211, 238, 0.2)'); // Soft cyan boundary
+                flashGradient.addColorStop(1, 'rgba(34, 211, 238, 0)'); // Fades out
+                
+                ctx.fillStyle = flashGradient;
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, flashRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Reset composite blend mode back to normal
+            ctx.globalCompositeOperation = 'source-over';
+        }
+    }
+
+    /**
+     * Main Game Loop
+     */
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    // Init
+    loop();
+
+</script>
+</body>
+</html>
